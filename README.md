@@ -1,7 +1,10 @@
-配置环境：将文件中requirements.txt文档中的包下载下来，可使用 pip install -r requirements.txt。
-运行train.py文件即可启动。
+This is the implementation of LResNet as residual connection in GNN architectures, where the base model is HyboNet from Fully Hyperbolic Neural Networks.
+Configuration Environment:
+Download the packages listed in the requirements.txt file using pip install -r requirements.txt.
+Run the train.py file to start the process.
 
-在文件夹models中的encoders.py中有所有可用的编码器。
-在文件夹manifolds中有所有可用的流形。
-在文件夹models中的models.py中有多尺度小波变换的代码。
+Available Components:
 
+All usable encoders are located in encoders.py within the models folder.
+All available manifolds are in the manifolds folder.
+The code for multi-scale wavelet transforms is in models.py inside the models folder.
