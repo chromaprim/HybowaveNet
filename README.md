@@ -1,4 +1,4 @@
-This is the implementation of LResNet as residual connection in GNN architectures, where the base model is HyboNet from Fully Hyperbolic Neural Networks.
+This is the implementation of LResNet as residual connection in GNN architectures, where the base model is HyboNet from [Fully Hyperbolic Neural Networks].(https://arxiv.org/abs/2105.14686).
 # Environment Configuration  
 Install the required packages by running:  
 ```bash
