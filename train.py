@@ -170,127 +170,158 @@ class FullyHyperbolicNN(nn.Module):
         return self.dropout(embeddings)
 
 #设置参数
-import argparse
-parser = argparse.ArgumentParser()
-args = parser.parse_args()
-args.model = "HyboNet"
-args.num_layers = 2
-args.dropout = 0.0
-args.bias = 1
-args.use_att = 1
-args.local_agg = 0
-args.val_prop =0.05
-args.test_prop =0.1
-args.use_feats =1
-args.normalize_feats =1
-args.normalize_adj =1
-args.split_seed =1234
-args.manifold = "Lorentz"
-args.act = None
-args.dim = 128
-args.task = "lp"
-args.c = 1.
-args.cuda = -1
-args.n_heads = 8
-args.alpha = 0.2
-args.pretrained_embeddings = None
-args.save = 0
-args.patience = 200
-args.min_epochs = 200
-args.scales = [1,2,3,4]
+
 # 数据加载
 from utils.data_utils import load_data
-data = load_data(args)
-args.n_nodes, args.feat_dim = data['features'].shape
-args.nb_false_edges = len(data['train_edges_false'])
-args.nb_edges = len(data['train_edges'])
+def train(args):
+    data = load_data(args)
+    args.n_nodes, args.feat_dim = data['features'].shape
+    args.nb_false_edges = len(data['train_edges_false'])
+    args.nb_edges = len(data['train_edges'])
 
 
-# 初始化模型
-model = FullyHyperbolicNN(args=args,drug_dim=128, protein_dim=128, hidden_dim=64)
-GWTmodel = GWTNet(args)
-# 优化器
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    # 初始化模型
+    model = FullyHyperbolicNN(args=args,drug_dim=128, protein_dim=128, hidden_dim=64)
+    GWTmodel = GWTNet(args)
+    # 优化器
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-best_val_metrics = model.drug_extractor.init_metric_dict()
-best_test_metrics = None
-best_emb = None
-counter = 0
-
-
-# 训练循环
-for epoch in range(2000):
-    model.train()
-    optimizer.zero_grad()
-    embeddings = model(data['features'], data['protein_features'],data["adj_train_norm"],data['protein_adj'])
+    best_val_metrics = model.drug_extractor.init_metric_dict()
+    best_test_metrics = None
+    best_emb = None
+    counter = 0
 
 
-
-    protein_embeddings_view1 = model.generate_graph_features_with_dropout(embeddings)
-    protein_embeddings_view2 = model.generate_graph_features_with_dropout(embeddings)
-    contrastive_loss_drug = model.contrastive_loss(protein_embeddings_view1, protein_embeddings_view2)
-
-
-
-    embeddings = embeddings.detach().numpy()
-    embeddings = GWTmodel(embeddings,data["adj_train_norm"])
-    edges_false = data['train_edges_false'][np.random.randint(0, args.nb_false_edges, args.nb_edges)]
-    train_metrics = GWTmodel.compute_metrics(embeddings, data["train_edges"], edges_false)
-
-
-
-    all_train_metrics = 0.1*contrastive_loss_drug + train_metrics['loss']
-
-
-
-    # train_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'train')
-    all_train_metrics.backward()
-    optimizer.step()
-    print(f"Epoch {epoch}, Loss: {train_metrics['loss'].item()},roc:{train_metrics['roc'].item()},ap:{train_metrics['ap'].item()}")
-
-    with torch.no_grad():
-        model.eval()
+    # 训练循环
+    for epoch in range(2000):
+        model.train()
+        optimizer.zero_grad()
         embeddings = model(data['features'], data['protein_features'],data["adj_train_norm"],data['protein_adj'])
+
+
+
+        protein_embeddings_view1 = model.generate_graph_features_with_dropout(embeddings)
+        protein_embeddings_view2 = model.generate_graph_features_with_dropout(embeddings)
+        contrastive_loss_drug = model.contrastive_loss(protein_embeddings_view1, protein_embeddings_view2)
 
 
 
         embeddings = embeddings.detach().numpy()
         embeddings = GWTmodel(embeddings,data["adj_train_norm"])
+        edges_false = data['train_edges_false'][np.random.randint(0, args.nb_false_edges, args.nb_edges)]
+        train_metrics = GWTmodel.compute_metrics(embeddings, data["train_edges"], edges_false)
 
 
 
-        val_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'val')
-        print(f"Epoch {epoch}, Loss: {val_metrics['loss'].item()},roc:{val_metrics['roc'].item()},ap:{val_metrics['ap'].item()}")
-        if model.drug_extractor.has_improved(best_val_metrics, val_metrics):
-            best_test_metrics = model.drug_extractor.compute_metrics(
-                embeddings, data, 'test')
-            best_emb = embeddings.cpu()
-            if args.save:
-                # np.save(os.path.join(save_dir, 'embeddings.npy'),
-                #         best_emb.detach().numpy())
-                pass
-            best_val_metrics = val_metrics
-            counter = 0
-        else:
-            counter += 1
-            if counter == args.patience and epoch > args.min_epochs:
-                print("Early stopping")
-                break
-# model.eval()
-# embeddings = model(data['features'], data['protein_features'], data["adj_train_norm"], data['protein_adj'])
-# test_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'test')
+        all_train_metrics = 0.1*contrastive_loss_drug + train_metrics['loss']
 
-if not best_test_metrics:
-    model.eval()
-    best_emb = model(data['features'], data['protein_features'], data["adj_train_norm"], data['protein_adj'])
 
-    # best_emb = best_emb.detach().numpy()
-    # best_emb = GWTmodel(best_emb,data["adj_train_norm"])
 
-    # best_test_metrics = model.drug_extractor.compute_metrics(best_emb, data, 'test')
-print(" ".join(
-    ["Val set results:",
-     format_metrics(best_val_metrics, 'val')]))
-print(" ".join(
-    ["Test set results:",
-     format_metrics(best_test_metrics, 'test')]))
+        # train_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'train')
+        all_train_metrics.backward()
+        optimizer.step()
+        print(f"Epoch {epoch}, Loss: {train_metrics['loss'].item()},roc:{train_metrics['roc'].item()},ap:{train_metrics['ap'].item()}")
+
+        with torch.no_grad():
+            model.eval()
+            embeddings = model(data['features'], data['protein_features'],data["adj_train_norm"],data['protein_adj'])
+
+
+
+            embeddings = embeddings.detach().numpy()
+            embeddings = GWTmodel(embeddings,data["adj_train_norm"])
+
+
+
+            val_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'val')
+            print(f"Epoch {epoch}, Loss: {val_metrics['loss'].item()},roc:{val_metrics['roc'].item()},ap:{val_metrics['ap'].item()}")
+            if model.drug_extractor.has_improved(best_val_metrics, val_metrics):
+                best_test_metrics = model.drug_extractor.compute_metrics(
+                    embeddings, data, 'test')
+                best_emb = embeddings.cpu()
+                if args.save:
+                    # np.save(os.path.join(save_dir, 'embeddings.npy'),
+                    #         best_emb.detach().numpy())
+                    pass
+                best_val_metrics = val_metrics
+                counter = 0
+            else:
+                counter += 1
+                if counter == args.patience and epoch > args.min_epochs:
+                    print("Early stopping")
+                    break
+    # model.eval()
+    # embeddings = model(data['features'], data['protein_features'], data["adj_train_norm"], data['protein_adj'])
+    # test_metrics = model.drug_extractor.compute_metrics(embeddings, data, 'test')
+
+    if not best_test_metrics:
+        model.eval()
+        best_emb = model(data['features'], data['protein_features'], data["adj_train_norm"], data['protein_adj'])
+
+        # best_emb = best_emb.detach().numpy()
+        # best_emb = GWTmodel(best_emb,data["adj_train_norm"])
+
+        # best_test_metrics = model.drug_extractor.compute_metrics(best_emb, data, 'test')
+    print(" ".join(
+        ["Val set results:",
+         format_metrics(best_val_metrics, 'val')]))
+    print(" ".join(
+        ["Test set results:",
+         format_metrics(best_test_metrics, 'test')]))
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    # Add all arguments properly
+    parser.add_argument('--model', type=str, default="HyboNet")
+    parser.add_argument('--num_layers', type=int, default=2)
+    parser.add_argument('--dropout', type=float, default=0.0)
+    parser.add_argument('--bias', type=int, default=1)
+    parser.add_argument('--use_att', type=int, default=1)
+    parser.add_argument('--local_agg', type=int, default=0)
+    parser.add_argument('--val_prop', type=float, default=0.05)
+    parser.add_argument('--test_prop', type=float, default=0.1)
+    parser.add_argument('--use_feats', type=int, default=1)
+    parser.add_argument('--normalize_feats', type=int, default=1)
+    parser.add_argument('--normalize_adj', type=int, default=1)
+    parser.add_argument('--split_seed', type=int, default=1234)
+    parser.add_argument('--manifold', type=str, default="Lorentz")
+    parser.add_argument('--act', type=str, default=None)
+    parser.add_argument('--dim', type=int, default=128)
+    parser.add_argument('--task', type=str, default="lp")
+    parser.add_argument('--c', type=float, default=1.0)
+    parser.add_argument('--cuda', type=int, default=-1)
+    parser.add_argument('--n_heads', type=int, default=8)
+    parser.add_argument('--alpha', type=float, default=0.2)
+    parser.add_argument('--pretrained_embeddings', type=str, default=None)
+    parser.add_argument('--save', type=int, default=0)
+    parser.add_argument('--patience', type=int, default=200)
+    parser.add_argument('--min_epochs', type=int, default=200)
+    parser.add_argument('--scales', nargs='+', type=int, default=[1, 2, 3, 4])  # List of integers
+
+    args = parser.parse_args()
+    args.model = "HyboNet"
+    args.num_layers = 2
+    args.dropout = 0.0
+    args.bias = 1
+    args.use_att = 1
+    args.local_agg = 0
+    args.val_prop = 0.05
+    args.test_prop = 0.1
+    args.use_feats = 1
+    args.normalize_feats = 1
+    args.normalize_adj = 1
+    args.split_seed = 1234
+    args.manifold = "Lorentz"
+    args.act = None
+    args.dim = 128
+    args.task = "lp"
+    args.c = 1.
+    args.cuda = -1
+    args.n_heads = 8
+    args.alpha = 0.2
+    args.pretrained_embeddings = None
+    args.save = 0
+    args.patience = 200
+    args.min_epochs = 200
+    args.scales = [1, 2, 3, 4]
+    train(args)
