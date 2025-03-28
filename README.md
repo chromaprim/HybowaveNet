@@ -8,7 +8,7 @@ pip install -r requirements.txt
 # Training  
 Execute the training script by running:  
 ```bash
-python train.py
+python train.py  --model "HyboNet" --num_layers 2 --dropout 0.0 --bias 1 --use_att 1 --local_agg 0 --val_prop 0.05 --test_prop 0.1 --use_feats 1 --normalize_feats 1  --normalize_adj 1 --split_seed 1234 --manifold "Lorentz" --act None --dim 128 --task "lp" --c 1.0 --cuda -1 --n_heads 8 --alpha 0.2 --pretrained_embeddings None  --save 0 --patience 200 --min_epochs 200  --scales 1 2 3 4 
 ```  
 
 # Available Components  
